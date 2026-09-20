@@ -57,7 +57,7 @@ async function getPronunciationIndex():
     return loadingPromise
   }
 
-  loadingPromise = fetch('/data/cmudict.dict')
+ loadingPromise = fetch(`${import.meta.env.BASE_URL}data/cmudict.dict`)
     .then((response) => {
       if (!response.ok) {
         throw new Error(

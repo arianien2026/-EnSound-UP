@@ -1740,31 +1740,6 @@ export default function App() {
 
         
       </section>
-
-      <footer className="release-footer">
-        <div className="release-footer-copy">
-          <strong>{t('幫助 EnSound UP 變得更好', 'Help improve EnSound UP')}</strong>
-          <span>{t('有任何建議，或發現發音聽起來不自然，都歡迎告訴我們。', 'Feedback about the exercises, UI, or unnatural audio is welcome.')}</span>
-        </div>
-        <div className="release-footer-actions">
-          <a
-            className="release-footer-link"
-            href="https://forms.gle/saW24XFSynYDiFW59"
-            target="_blank"
-            rel="noreferrer"
-          >
-            {t('提供意見', 'Send Feedback')}
-          </a>
-          <a
-            className="release-footer-link support"
-            href="https://ko-fi.com/entubeup"
-            target="_blank"
-            rel="noreferrer"
-          >
-            {t('☕ 贊助 UP Tools', '☕ Support UP Tools')}
-          </a>
-        </div>
-      </footer>
     </main>
   )
 }
