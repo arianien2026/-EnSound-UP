@@ -74,7 +74,46 @@ const LEVEL1_STAGES = [
 ]
 
 
+type FreeUsage = {
+  repeat: number
+  questions: number
+}
+
+const FREE_USAGE_KEY = 'ensound-free-usage'
+
 export default function App() {
+const [accessLevel, setAccessLevel] = useState<'free' | 'full'>('free')
+const isFull = accessLevel === 'full'
+type PaywallReason = 'repeat' | 'questions' | null
+
+const [paywallReason, setPaywallReason] = useState<PaywallReason>(null)
+  const [showProductInfo, setShowProductInfo] = useState(false)
+  const [legalPage, setLegalPage] = useState<'terms' | 'refund' | 'privacy' | null>(null)
+
+  const [freeUsage, setFreeUsage] = useState<FreeUsage>(() => {
+    const saved = window.localStorage.getItem(FREE_USAGE_KEY)
+
+    if (saved) {
+      try {
+        return JSON.parse(saved) as FreeUsage
+      } catch {
+        // Ignore invalid saved data and start fresh.
+      }
+    }
+
+    return {
+      repeat: 0,
+      questions: 0,
+    }
+  })
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      FREE_USAGE_KEY,
+      JSON.stringify(freeUsage),
+    )
+  }, [freeUsage])
+
   const appVisitCapturedRef = useRef(false)
 
   useEffect(() => {
@@ -96,10 +135,106 @@ export default function App() {
   const isZh = uiLang === 'zh-TW'
   const t = (zh: string, en: string) => (isZh ? zh : en)
 
+  const isInAppBrowser = useMemo(() => {
+    const ua = navigator.userAgent || ''
+    return /FBAN|FBAV|Instagram/i.test(ua)
+  }, [])
+
+  function InAppBrowserNotice() {
+    if (!isInAppBrowser) return null
+
+    return (
+      <div
+        role="status"
+        style={{
+          margin: '0 auto 14px',
+          padding: '12px 14px',
+          border: '1px solid #dbe5ff',
+          borderRadius: '14px',
+          background: '#f7f9ff',
+          fontSize: '0.92rem',
+          lineHeight: 1.55,
+          textAlign: 'left',
+        }}
+      >
+        <strong>{t('⚠️ 建議使用瀏覽器開啟', '⚠️ Open in your browser')}</strong>
+        <div>
+          {t(
+            '為了正常播放發音與使用練習功能，請使用 Chrome 或 Safari 開啟 EnSound UP。',
+            'For reliable audio and practice features, please open EnSound UP in Chrome or Safari.',
+          )}
+        </div>
+      </div>
+    )
+  }
+
   function changeUiLang(lang: 'zh-TW' | 'en') {
     setUiLang(lang)
     window.localStorage.setItem('ensound-ui-lang', lang)
   }
+
+  function tryUseRepeat() {
+    if (isFull) return true
+
+    if (freeUsage.repeat >= 3) {
+      setPaywallReason('repeat')
+      return false
+    }
+
+    setFreeUsage((current) => ({
+      ...current,
+      repeat: current.repeat + 1,
+    }))
+    return true
+  }
+
+function renderPaywall() {
+  if (!paywallReason) return null
+
+  return (
+    <div className="paywall-card">
+      <div className="paywall-badge">EnSound UP Full</div>
+
+      <h3>
+        {t('免費體驗已用完', 'Free trial limit reached')}
+      </h3>
+
+      <p>
+        {paywallReason === 'repeat' &&
+          t(
+            '免費版提供 3 次 Repeat 體驗。升級完整版後即可使用無限 Repeat ♾️',
+            'Free includes 3 Repeat trials. Upgrade to Full for unlimited Repeat ♾️',
+          )}
+
+        {paywallReason === 'questions' &&
+          t(
+            '免費版提供 3 題體驗。升級完整版即可繼續挑戰。',
+            'Free includes 3 trial questions. Upgrade to Full to continue.',
+          )}
+      </p>
+
+      <div className="paywall-actions">
+        <button
+          type="button"
+          className="paywall-primary"
+          onClick={() => {
+            // Payment flow will be connected later.
+          }}
+        >
+          {t('解鎖完整版', 'Unlock Full')}
+        </button>
+
+        <button
+          type="button"
+          className="paywall-secondary"
+          onClick={() => setPaywallReason(null)}
+        >
+          {t('稍後再說', 'Maybe later')}
+        </button>
+      </div>
+    </div>
+  )
+}
 
   const [screen, setScreen] = useState<'sentence' | 'vowel' | 'contrast' | 'audioqa' | 'level2proto' | 'choose2'>('contrast')
   const [selectedASoundIndex, setSelectedASoundIndex] = useState(0)
@@ -209,15 +344,17 @@ export default function App() {
     speakWord(selectedWord.spoken, rate)
   }
 
-  function handleRepeat() {
-    if (!selectedWord) return
+function handleRepeat() {
+  if (!selectedWord) return
 
-    stopRepeat()
+if (!tryUseRepeat()) return
+
+  stopRepeat()
+  speakWord(selectedWord.spoken, 0.9)
+  repeatTimerRef.current = window.setInterval(() => {
     speakWord(selectedWord.spoken, 0.9)
-    repeatTimerRef.current = window.setInterval(() => {
-      speakWord(selectedWord.spoken, 0.9)
-    }, 1800)
-  }
+  }, 1800)
+}
 
   function highlightLetterA(word: string) {
     const index = word.toLowerCase().indexOf('a')
@@ -246,6 +383,8 @@ export default function App() {
       stopASoundRepeat()
       return
     }
+
+    if (!tryUseRepeat()) return
 
     aSoundRepeatRef.current = true
     setIsASoundRepeating(true)
@@ -302,6 +441,8 @@ export default function App() {
       return
     }
 
+    if (!tryUseRepeat()) return
+
     stopContrastRepeat()
     abLoopRef.current = true
     setIsABLooping(true)
@@ -348,6 +489,8 @@ export default function App() {
       return
     }
 
+    if (!tryUseRepeat()) return
+
     window.speechSynthesis.cancel()
     contrastRepeatRef.current = side
     setContrastRepeatSide(side)
@@ -373,39 +516,61 @@ export default function App() {
   }
 
 
-  function startChallenge() {
-    posthog.capture('practice_started', {
-      mode: 'guided',
-      stage: contrastStage.id,
-    })
-    stopASoundRepeat()
-    stopContrastRepeat()
-    setChallengeQuestion(0)
-    setChallengeScore(0)
-    setChallengeAnswer(null)
-    setHasListened(false)
-    setChallengeTarget(Math.random() < 0.5 ? 'left' : 'right')
-    setContrastPhase('challenge')
+function startChallenge() {
+  if (!isFull && freeUsage.questions >= 3) {
+    setPaywallReason('questions')
+    return
   }
 
-  function answerChallenge(side: 'left' | 'right') {
-    if (challengeAnswer !== null) return
-    setChallengeAnswer(side)
-    if (side === challengeTarget) setChallengeScore((score) => score + 1)
+  posthog.capture('practice_started', {
+    mode: 'guided',
+    stage: contrastStage.id,
+  })
+
+  stopASoundRepeat()
+  stopContrastRepeat()
+  setChallengeQuestion(0)
+  setChallengeScore(0)
+  setChallengeAnswer(null)
+  setHasListened(false)
+  setChallengeTarget(Math.random() < 0.5 ? 'left' : 'right')
+  setContrastPhase('challenge')
+}
+
+function answerChallenge(side: 'left' | 'right') {
+  if (challengeAnswer !== null) return
+
+  if (!isFull) {
+    setFreeUsage((current) => ({
+      ...current,
+      questions: current.questions + 1,
+    }))
   }
 
-  function nextChallengeQuestion() {
-    if (challengeQuestion >= 5) {
-      setContrastPhase('result')
-      return
-    }
-    const next = challengeQuestion + 1
-    setChallengeQuestion(next)
-    setContrastPairIndex(next % contrastStage.pairs.length)
-    setChallengeAnswer(null)
-    setHasListened(false)
-    setChallengeTarget(Math.random() < 0.5 ? 'left' : 'right')
+  setChallengeAnswer(side)
+
+  if (side === challengeTarget) {
+    setChallengeScore((score) => score + 1)
   }
+}
+function nextChallengeQuestion() {
+  if (!isFull && freeUsage.questions >= 3) {
+    setPaywallReason('questions')
+    return
+  }
+
+  if (challengeQuestion >= 5) {
+    setContrastPhase('result')
+    return
+  }
+
+  const next = challengeQuestion + 1
+  setChallengeQuestion(next)
+  setContrastPairIndex(next % contrastStage.pairs.length)
+  setChallengeAnswer(null)
+  setHasListened(false)
+  setChallengeTarget(Math.random() < 0.5 ? 'left' : 'right')
+}
 
   const CONTRAST_LAB = [
     { id: 'A', left: { vowel: 'æ', word: 'cap', ipa: '/kæp/' }, right: { vowel: 'ʌ', word: 'cup', ipa: '/kʌp/' } },
@@ -462,6 +627,8 @@ export default function App() {
       return
     }
 
+    if (!tryUseRepeat()) return
+
     stopContrastRepeat()
     stopASoundRepeat()
     window.speechSynthesis.cancel()
@@ -506,11 +673,18 @@ export default function App() {
                   <button className={uiLang === 'en' ? 'active' : ''} onClick={() => changeUiLang('en')}>EN</button>
                 </div>
                 <div className="header-utility-links">
+                  <button
+                    type="button"
+                    className="upgrade-full-button"
+                    onClick={() => setShowProductInfo(true)}
+                  >
+                    {t('解鎖完整版', 'Unlock Full')}
+                  </button>
                   <a href="https://forms.gle/saW24XFSynYDiFW59" target="_blank" rel="noreferrer">
                     {t('意見回饋','Feedback')}
                   </a>
-                  <a href="https://ko-fi.com/entubeup" target="_blank" rel="noreferrer">
-                    {t('☕ 贊助','☕ Support')}
+                  <a href="mailto:uptools.support@gmail.com">
+                    {t('聯絡我們','Contact')}
                   </a>
                 </div>
               </div>
@@ -518,6 +692,8 @@ export default function App() {
             </div>
           </header>
           <MainNav active="lab" />
+          <InAppBrowserNotice />
+          <ProductInfo />
 
           <p className="eyebrow">Step 3D-2 · L1 Lab</p>
           <h1 className="contrast-title">Level 1 · Two Vowels</h1>
@@ -580,8 +756,11 @@ export default function App() {
           <p className="qa-note">
             A–D use tightly controlled consonant frames. HOT / HEAD is marked experimental because the final consonant also changes.
           </p>
+
+          {paywallReason === 'repeat' && renderPaywall()}
         </section>
-      </main>
+        <SiteFooter />
+    </main>
     )
   }
 
@@ -620,6 +799,7 @@ export default function App() {
       stopChooseLoop()
       return
     }
+    if (!tryUseRepeat()) return
     stopQaLoop()
     stopL2Loop()
     stopContrastRepeat()
@@ -683,6 +863,223 @@ export default function App() {
     setChooseTarget(Math.random() < .5 ? 0 : 1)
   }
 
+
+  function ProductInfo() {
+    if (!showProductInfo) return null
+
+    return (
+      <div
+        role="presentation"
+        onClick={() => setShowProductInfo(false)}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 1000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px',
+          background: 'rgba(20, 38, 86, 0.18)',
+          backdropFilter: 'blur(3px)',
+        }}
+      >
+        <section
+          role="dialog"
+          aria-modal="true"
+          aria-label={t('EnSound UP 商品資訊', 'EnSound UP product information')}
+          onClick={(event) => event.stopPropagation()}
+          style={{
+            width: 'min(460px, 100%)',
+            padding: '24px',
+            border: '1px solid #dbe5ff',
+            borderRadius: '20px',
+            background: '#fff',
+            boxShadow: '0 18px 50px rgba(28, 53, 120, 0.16)',
+            textAlign: 'center',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button
+              type="button"
+              onClick={() => setShowProductInfo(false)}
+              aria-label={t('關閉', 'Close')}
+              style={{ border: 0, background: 'transparent', cursor: 'pointer', fontSize: '1.25rem' }}
+            >
+              ×
+            </button>
+          </div>
+          <p className="eyebrow" style={{ marginBottom: '6px' }}>
+            {t('EnSound UP Web 完整版', 'EnSound UP Web Full')}
+          </p>
+          <h2 style={{ margin: '0 0 12px' }}>
+            {t('英文發音與母音辨識練習工具', 'English pronunciation and vowel listening practice')}
+          </h2>
+          <p style={{ margin: '0 0 8px' }}>
+            {t('正式售價 ', 'Regular price ')}<strong>NT$199</strong>
+          </p>
+          <p style={{ margin: '0 0 12px' }}>
+            <strong>{t('首發限量 50 份 NT$99', 'Launch offer · first 50 purchases NT$99')}</strong>
+          </p>
+          <p style={{ margin: '0 0 18px' }}>
+            {t(
+              '一次買斷 EnSound UP Web 完整版。基礎聆聽功能免費使用；完整版提供完整練習與無限 Repeat。',
+              'One-time purchase for EnSound UP Web Full. Basic listening stays free; Full unlocks complete practice and unlimited Repeat.',
+            )}
+          </p>
+
+          <div
+            style={{
+              margin: '0 0 18px',
+              padding: '16px',
+              borderRadius: '14px',
+              background: '#f7f9ff',
+              textAlign: 'left',
+            }}
+          >
+            <p style={{ margin: '0 0 5px', fontWeight: 700 }}>
+              {t('付款方式', 'Payment')}
+            </p>
+            <p style={{ margin: '0 0 14px', fontSize: '0.92rem', lineHeight: 1.6 }}>
+              {t(
+                '線上付款（正式開放後由綠界科技提供付款服務）',
+                'Online payment (payment service will be provided by ECPay after launch).',
+              )}
+            </p>
+
+            <p style={{ margin: '0 0 5px', fontWeight: 700 }}>
+              {t('退款說明', 'Refunds')}
+            </p>
+            <p style={{ margin: 0, fontSize: '0.92rem', lineHeight: 1.6 }}>
+              {t(
+                '購買後 7 日內可聯絡客服提出退款申請。退款完成後，完整版使用權將停止。',
+                'You may contact support to request a refund within 7 days of purchase. Full access will end after the refund is completed.',
+              )}
+            </p>
+          </div>
+
+          <p style={{ margin: 0, fontSize: '0.92rem' }}>
+            {t('客服：', 'Support: ')}
+            <a href="mailto:uptools.support@gmail.com">uptools.support@gmail.com</a>
+          </p>
+        </section>
+      </div>
+    )
+  }
+
+
+  function LegalModal() {
+    if (!legalPage) return null
+
+    const content = {
+      terms: {
+        title: t('服務條款', 'Terms of Service'),
+        body: isZh ? (
+          <>
+            <p>EnSound UP 是由 UP Tools 提供的英文發音與聽辨練習 Web 工具。使用本服務即表示您同意依本條款使用網站與相關功能。</p>
+            <h3>購買內容</h3>
+            <p>付費商品為「EnSound UP Web 完整版」，採一次買斷。購買後可使用目前 Web 完整版所提供的完整練習與無限 Repeat 等付費功能。</p>
+            <p>本次 Web 完整版購買不代表包含未來 App、其他 UP Tools 產品、獨立新服務或所有未來重大版本；若未來推出上述產品或服務，可能另行販售。</p>
+            <h3>使用與維護</h3>
+            <p>UP Tools 可能為維護、安全、錯誤修正或改善使用體驗而更新本服務。使用者不得以違法方式使用本服務，亦不得未經授權重製或散布受保護的內容。</p>
+            <h3>聯絡方式</h3>
+            <p>如有購買、使用或帳號相關問題，請聯絡 uptools.support@gmail.com。</p>
+          </>
+        ) : (
+          <>
+            <p>EnSound UP is a web-based English pronunciation and listening practice tool provided by UP Tools. By using the service, you agree to use the website and its features in accordance with these terms.</p>
+            <h3>Purchase</h3>
+            <p>The paid product is EnSound UP Web Full, offered as a one-time purchase. It unlocks the paid features included in the current Web Full version, including complete practice and unlimited Repeat.</p>
+            <p>This Web purchase does not include future apps, other UP Tools products, separate new services, or every future major version. Those may be sold separately.</p>
+            <h3>Use and maintenance</h3>
+            <p>UP Tools may update the service for maintenance, security, bug fixes, or user-experience improvements. The service may not be used unlawfully, and protected content may not be reproduced or distributed without authorization.</p>
+            <h3>Contact</h3>
+            <p>For purchase, access, or account questions, contact uptools.support@gmail.com.</p>
+          </>
+        ),
+      },
+      refund: {
+        title: t('退款政策', 'Refund Policy'),
+        body: isZh ? (
+          <>
+            <p>EnSound UP Web 完整版提供購買後 7 日內申請退款的服務政策。</p>
+            <h3>如何申請</h3>
+            <p>請於購買後 7 日內寄信至 uptools.support@gmail.com，並提供足以確認訂單的購買 Email 或相關訂單資訊。請勿以 Email 傳送信用卡完整卡號或其他不必要的敏感資料。</p>
+            <h3>退款完成後</h3>
+            <p>退款完成後，該筆購買的 EnSound UP Web 完整版使用權將停止。若日後重新購買，將依重新購買當時的售價與活動條件計算。</p>
+            <p>本退款政策不限制依法不得排除或限制的消費者權利。</p>
+          </>
+        ) : (
+          <>
+            <p>EnSound UP Web Full offers a service policy allowing refund requests within 7 days of purchase.</p>
+            <h3>How to request a refund</h3>
+            <p>Email uptools.support@gmail.com within 7 days of purchase and provide the purchase email or order information needed to identify the transaction. Do not email full card numbers or other unnecessary sensitive information.</p>
+            <h3>After a refund</h3>
+            <p>Once the refund is completed, access associated with that EnSound UP Web Full purchase will end. A later repurchase will use the price and promotion available at that time.</p>
+            <p>This policy does not limit consumer rights that cannot legally be excluded or restricted.</p>
+          </>
+        ),
+      },
+      privacy: {
+        title: t('隱私權政策', 'Privacy Policy'),
+        body: isZh ? (
+          <>
+            <p>UP Tools 以資料最小化為原則。EnSound UP 的基本練習資料與免費使用額度目前主要儲存在您的瀏覽器本機。</p>
+            <h3>網站分析</h3>
+            <p>本網站使用 PostHog 協助了解網站造訪與部分功能使用情形，以改善產品。分析資料可能包含瀏覽器、裝置、作業系統、概略地區及產品互動事件等技術資訊。</p>
+            <h3>購買與帳號資料</h3>
+            <p>當購買與帳號功能正式啟用後，為處理付款、授權、登入與客服，可能需要處理購買 Email、訂單狀態與必要的裝置授權資料。付款資料將由付款服務提供者依其服務流程處理；UP Tools 不要求您透過客服提供完整信用卡資料。</p>
+            <h3>聯絡我們</h3>
+            <p>如對隱私或資料處理有疑問，請聯絡 uptools.support@gmail.com。</p>
+          </>
+        ) : (
+          <>
+            <p>UP Tools follows a data-minimization approach. EnSound UP currently keeps basic practice data and free-usage limits primarily in your browser's local storage.</p>
+            <h3>Website analytics</h3>
+            <p>This website uses PostHog to understand visits and selected product interactions so we can improve the service. Analytics may include technical information such as browser, device, operating system, approximate region, and product interaction events.</p>
+            <h3>Purchase and account data</h3>
+            <p>When purchase and account features are enabled, we may process purchase email, order status, and necessary device-authorization data to provide payment, access, sign-in, and support. Payment information is handled through the payment provider's flow; UP Tools does not ask you to send full card details to support.</p>
+            <h3>Contact</h3>
+            <p>For privacy or data-handling questions, contact uptools.support@gmail.com.</p>
+          </>
+        ),
+      },
+    }[legalPage]
+
+    return (
+      <div className="legal-modal-backdrop" role="presentation" onClick={() => setLegalPage(null)}>
+        <section className="legal-modal" role="dialog" aria-modal="true" aria-label={content.title} onClick={(event) => event.stopPropagation()}>
+          <div className="legal-modal-header">
+            <div>
+              <p className="eyebrow">UP Tools · EnSound UP</p>
+              <h2>{content.title}</h2>
+            </div>
+            <button type="button" className="legal-close" onClick={() => setLegalPage(null)} aria-label={t('關閉', 'Close')}>×</button>
+          </div>
+          <div className="legal-modal-body">{content.body}</div>
+        </section>
+      </div>
+    )
+  }
+
+  function SiteFooter() {
+    return (
+      <>
+        <footer className="legal-footer">
+          <span>© 2026 UP Tools</span>
+          <nav aria-label={t('網站政策', 'Site policies')}>
+            <button type="button" onClick={() => setLegalPage('terms')}>{t('服務條款', 'Terms')}</button>
+            <span aria-hidden="true">｜</span>
+            <button type="button" onClick={() => setLegalPage('refund')}>{t('退款政策', 'Refund Policy')}</button>
+            <span aria-hidden="true">｜</span>
+            <button type="button" onClick={() => setLegalPage('privacy')}>{t('隱私權政策', 'Privacy Policy')}</button>
+            <span aria-hidden="true">｜</span>
+            <a href="mailto:uptools.support@gmail.com">{t('聯絡我們', 'Contact')}</a>
+          </nav>
+        </footer>
+        <LegalModal />
+      </>
+    )
+  }
 
   function MainNav({ active }: { active: 'sentence' | 'vowel' | 'guided' | 'choose2' | 'lab' | 'level2' }) {
     return (
@@ -848,11 +1245,18 @@ export default function App() {
                   <button className={uiLang === 'en' ? 'active' : ''} onClick={() => changeUiLang('en')}>EN</button>
                 </div>
                 <div className="header-utility-links">
+                  <button
+                    type="button"
+                    className="upgrade-full-button"
+                    onClick={() => setShowProductInfo(true)}
+                  >
+                    {t('解鎖完整版', 'Unlock Full')}
+                  </button>
                   <a href="https://forms.gle/saW24XFSynYDiFW59" target="_blank" rel="noreferrer">
                     {t('意見回饋','Feedback')}
                   </a>
-                  <a href="https://ko-fi.com/entubeup" target="_blank" rel="noreferrer">
-                    {t('☕ 贊助','☕ Support')}
+                  <a href="mailto:uptools.support@gmail.com">
+                    {t('聯絡我們','Contact')}
                   </a>
                 </div>
               </div>
@@ -860,6 +1264,8 @@ export default function App() {
             </div>
           </header>
           <MainNav active="choose2" />
+          <InAppBrowserNotice />
+          <ProductInfo />
 
           <p className="eyebrow">{t('自由選 2 音 · 第 1 級','Choose 2 · Level 1')}</p>
           <h1 className="contrast-title">{t('請點選任 2 個音標練習','Pick two vowel sounds')}</h1>
@@ -955,6 +1361,7 @@ export default function App() {
                 <div className="loop-word-indicators">{displayItems.map(item=><span key={item.word} className={choosePlayingWord===item.word?'playing':''}>{item.word.toUpperCase()}{choosePlayingWord===item.word?' 🔊':''}</span>)}</div>
                 <button className={`ab-loop-button ${chooseLooping?'active':''}`} onClick={()=>{
                   if (chooseLoopRef.current) { stopChooseLoop(); return }
+                  if (!tryUseRepeat()) return
                   stopQaLoop(); stopL2Loop(); stopContrastRepeat(); stopASoundRepeat()
                   chooseLoopRef.current=true; setChooseLooping(true)
                   const words=displayItems.map(x=>x.word)
@@ -967,9 +1374,30 @@ export default function App() {
                   };go(0)
                 }}>{chooseLooping?t('■ 停止循環','■ Stop Loop'):freeStage===2?t('∞ 4 音循環','∞ 4-Sound Loop'):t('∞ A/B 循環','∞ A/B Loop')}</button>
               </div>
-              <button className="start-challenge-button" onClick={()=>{
-                stopChooseLoop();setChooseQuestion(0);setChooseScore(0);setChooseAnswer(null);setChooseHasListened(false);setChooseTarget(Math.random()<.5?0:1);setChooseChallengePairIndex(freeStage===2?Math.floor(Math.random()*2):Math.min(freeStage,1));setChoosePhase('challenge')
-              }}>{t(`開始 ${freeStage===0?'1A':freeStage===1?'1B':'1C'} 的挑戰 →`,`Start ${freeStage===0?'1A':freeStage===1?'1B':'1C'} Challenge →`)}</button>
+<button className="start-challenge-button" onClick={()=>{
+  if (!isFull && freeUsage.questions >= 3) {
+    setPaywallReason('questions')
+    return
+  }
+
+  stopChooseLoop()
+  setChooseQuestion(0)
+  setChooseScore(0)
+  setChooseAnswer(null)
+  setChooseHasListened(false)
+  setChooseTarget(Math.random()<.5?0:1)
+  setChooseChallengePairIndex(
+    freeStage===2 ? Math.floor(Math.random()*2) : Math.min(freeStage,1)
+  )
+  setChoosePhase('challenge')
+}}>
+  {t(
+    `開始 ${freeStage===0?'1A':freeStage===1?'1B':'1C'} 的挑戰 →`,
+    `Start ${freeStage===0?'1A':freeStage===1?'1B':'1C'} Challenge →`
+  )}
+</button>
+
+{(paywallReason === 'questions' || paywallReason === 'repeat') && renderPaywall()}
             </>
           )}
 
@@ -989,18 +1417,50 @@ export default function App() {
               <div className="choose2-answer-grid">{items.map((item,i)=>{
                 const answered=chooseAnswer!==null, correct=answered&&i===chooseTarget, wrong=answered&&i===chooseAnswer&&i!==chooseTarget
                 return <button key={item.word} disabled={!chooseHasListened} className={`${correct?'correct':''} ${wrong?'wrong':''}`} onClick={()=>{
-                  if(answered)speakChoose(item.word);else{setChooseAnswer(i as 0|1);if(i===chooseTarget)setChooseScore(s=>s+1)}
+               if (answered) {
+  speakChoose(item.word)
+} else {
+  if (!isFull) {
+    setFreeUsage((current) => ({
+      ...current,
+      questions: current.questions + 1,
+    }))
+  }
+
+  setChooseAnswer(i as 0|1)
+
+  if (i===chooseTarget) {
+    setChooseScore(s=>s+1)
+  }
+}
                 }}>/{item.vowel}/{answered?' 🔊':''}</button>
               })}</div>
               {chooseAnswer!==null&&<div className={`challenge-feedback ${chooseAnswer===chooseTarget?'correct':'wrong'}`}><strong>{chooseAnswer===chooseTarget?t('✓ 正確！','✓ Correct!'):t('✕ 再試一次','✕ Not quite')}</strong><p>{t('正確發音：','The sound was')} /{items[chooseTarget].vowel}/</p><small>{t('點選任一答案即可再次聆聽比較。','Tap either answer to compare the sounds.')}</small><button className="next-question-button challenge-action-button" onClick={()=>{
-                if(chooseQuestion>=5)setChoosePhase('result');else{setChooseQuestion(q=>q+1);setChooseAnswer(null);setChooseHasListened(false);setChooseTarget(Math.random()<.5?0:1);setChooseChallengePairIndex(freeStage===2?Math.floor(Math.random()*2):Math.min(freeStage,1))}
+if (!isFull && freeUsage.questions >= 3) {
+  setPaywallReason('questions')
+  setChoosePhase('compare')
+  return
+}
+
+if (chooseQuestion >= 5) {
+  setChoosePhase('result')
+} else {
+  setChooseQuestion(q=>q+1)
+  setChooseAnswer(null)
+  setChooseHasListened(false)
+  setChooseTarget(Math.random()<.5?0:1)
+  setChooseChallengePairIndex(
+    freeStage===2 ? Math.floor(Math.random()*2) : Math.min(freeStage,1)
+  )
+}
               }}>{chooseQuestion>=5?t('查看結果 →',t('查看結果 →','See result →')):t('下一題 →','Next question →')}</button></div>}
             </div>
           })()}
 
           {lib && choosePhase==='result'&&<div className="level-result"><p className="eyebrow">{t('練習完成','Practice complete')}</p><h1>{chooseScore} / 6</h1><div className="result-actions"><button className="challenge-action-button" onClick={()=>setChoosePhase('compare')}>{t('← 再比較一次','← Compare again')}</button><button className="challenge-action-button" onClick={()=>{setChooseQuestion(0);setChooseScore(0);setChooseAnswer(null);setChooseHasListened(false);setChooseTarget(Math.random()<.5?0:1);setChoosePhase('challenge')}}>{t('重新挑戰','Retry Challenge')}</button></div></div>}
         </section>
-      </main>
+        <SiteFooter />
+    </main>
     )
   }
 
@@ -1038,6 +1498,7 @@ export default function App() {
       stopL2Loop()
       return
     }
+    if (!tryUseRepeat()) return
     stopQaLoop()
     stopContrastRepeat()
     stopASoundRepeat()
@@ -1127,6 +1588,11 @@ export default function App() {
   ] as const
 
   function startDiagnostic(){
+    if (!isFull && freeUsage.questions >= 3) {
+      setPaywallReason('questions')
+      return
+    }
+
     posthog.capture('practice_started', { mode: 'vowel_test' })
     stopL2Loop();setDiagQuestion(0);setDiagAnswer(null);setDiagListened(false);setDiagStarted(true);setDiagMistakes({});setDiagScore(0);setDiagTarget(Math.floor(Math.random()*TEST_BANK.length))
   }
@@ -1143,17 +1609,27 @@ export default function App() {
                   <button className={uiLang === 'en' ? 'active' : ''} onClick={() => changeUiLang('en')}>EN</button>
                 </div>
                 <div className="header-utility-links">
+                  <button
+                    type="button"
+                    className="upgrade-full-button"
+                    onClick={() => setShowProductInfo(true)}
+                  >
+                    {t('解鎖完整版', 'Unlock Full')}
+                  </button>
                   <a href="https://forms.gle/saW24XFSynYDiFW59" target="_blank" rel="noreferrer">
                     {t('意見回饋','Feedback')}
                   </a>
-                  <a href="https://ko-fi.com/entubeup" target="_blank" rel="noreferrer">
-                    {t('☕ 贊助','☕ Support')}
+                  <a href="mailto:uptools.support@gmail.com">
+                    {t('聯絡我們','Contact')}
                   </a>
                 </div>
               </div><p className="tagline">{t('找出你最需要加強的母音組合。', 'Find which vowel contrasts need more practice.')}</p></div></header>
       <MainNav active="level2" />
+          <ProductInfo />
 
       {!diagStarted&&!done&&<div className="diagnostic-intro"><p className="eyebrow">{t('母音測驗 · 診斷','Vowel Test · Diagnostic')}</p><h1 className="contrast-title">{t('10 題隨機聽力測驗', '10 random listening questions')}</h1><p className="contrast-subtitle"></p><div className="diagnostic-frame">{t('8 個母音 · 10 題聽力測驗', '8 vowel sounds · 10 questions')}</div><button className="start-challenge-button" onClick={startDiagnostic}>{t('開始 10 題測驗 →', 'Start 10-Question Test →')}</button></div>}
+
+      {paywallReason === 'questions' && renderPaywall()}
 
       {diagStarted&&!done&&<>
         <div className="challenge-topbar">
@@ -1199,6 +1675,12 @@ export default function App() {
               onClick={()=>{
                 if(answered){playL2Word(item.word);return}
                 const selectedIndex=TEST_BANK.findIndex((candidate)=>candidate.vowel===item.vowel&&candidate.word===item.word)
+                if (!isFull) {
+                  setFreeUsage((current) => ({
+                    ...current,
+                    questions: current.questions + 1,
+                  }))
+                }
                 setDiagAnswer(selectedIndex)
                 if(item.vowel===targetItem.vowel)setDiagScore(s=>s+1)
                 else setDiagMistakes(prev=>{
@@ -1226,6 +1708,14 @@ export default function App() {
           <div className="challenge-feedback-actions">
             <button onClick={()=>playL2Word(targetItem.word)}>{t('🔊 再播放一次','🔊 Hear again')}</button>
             <button className="next-primary" onClick={()=>{
+              if (!isFull && freeUsage.questions >= 3) {
+                setPaywallReason('questions')
+                setDiagStarted(false)
+                setDiagAnswer(null)
+                setDiagListened(false)
+                return
+              }
+
               if (diagQuestion === 9) {
                 posthog.capture('vowel_test_completed', {
                   total_questions: 10,
@@ -1244,7 +1734,7 @@ export default function App() {
           if(first){setFreeChosen([first.target,first.chosen]);setFreeStage(0);setChoosePhase('compare');setScreen('choose2')}
           else setScreen('choose2')
         }}>{t('練習較弱的母音 →','Practice weak sounds →')}</button></>}<button className="secondary-test-button" onClick={startDiagnostic}>{t('再測 10 題 →','Try another 10 →')}</button></div>}
-    </section></main>
+    </section><SiteFooter /></main>
   }
 
 
@@ -1264,11 +1754,18 @@ export default function App() {
                   <button className={uiLang === 'en' ? 'active' : ''} onClick={() => changeUiLang('en')}>EN</button>
                 </div>
                 <div className="header-utility-links">
+                  <button
+                    type="button"
+                    className="upgrade-full-button"
+                    onClick={() => setShowProductInfo(true)}
+                  >
+                    {t('解鎖完整版', 'Unlock Full')}
+                  </button>
                   <a href="https://forms.gle/saW24XFSynYDiFW59" target="_blank" rel="noreferrer">
                     {t('意見回饋','Feedback')}
                   </a>
-                  <a href="https://ko-fi.com/entubeup" target="_blank" rel="noreferrer">
-                    {t('☕ 贊助','☕ Support')}
+                  <a href="mailto:uptools.support@gmail.com">
+                    {t('聯絡我們','Contact')}
                   </a>
                 </div>
               </div>
@@ -1276,6 +1773,8 @@ export default function App() {
             </div>
           </header>
           <MainNav active="guided" />
+          <InAppBrowserNotice />
+          <ProductInfo />
 
           {contrastPhase === 'learn' && (
             <>
@@ -1376,9 +1875,11 @@ export default function App() {
                 <span>{contrastPair.left.word.slice(-1)}</span>
               </div>
 
-              <button className="start-challenge" onClick={startChallenge}>
-                {t(`開始 ${contrastStage.id} 的挑戰 →`,`Start ${contrastStage.id} Challenge →`)}
-              </button>
+<button className="start-challenge" onClick={startChallenge}>
+  {t(`開始 ${contrastStage.id} 的挑戰 →`,`Start ${contrastStage.id} Challenge →`)}
+</button>
+
+{(paywallReason === 'questions' || paywallReason === 'repeat') && renderPaywall()}
             </>
           )}
 
@@ -1484,7 +1985,8 @@ export default function App() {
             </div>
           )}
         </section>
-      </main>
+        <SiteFooter />
+    </main>
     )
   }
 
@@ -1501,11 +2003,18 @@ export default function App() {
                   <button className={uiLang === 'en' ? 'active' : ''} onClick={() => changeUiLang('en')}>EN</button>
                 </div>
                 <div className="header-utility-links">
+                  <button
+                    type="button"
+                    className="upgrade-full-button"
+                    onClick={() => setShowProductInfo(true)}
+                  >
+                    {t('解鎖完整版', 'Unlock Full')}
+                  </button>
                   <a href="https://forms.gle/saW24XFSynYDiFW59" target="_blank" rel="noreferrer">
                     {t('意見回饋','Feedback')}
                   </a>
-                  <a href="https://ko-fi.com/entubeup" target="_blank" rel="noreferrer">
-                    {t('☕ 贊助','☕ Support')}
+                  <a href="mailto:uptools.support@gmail.com">
+                    {t('聯絡我們','Contact')}
                   </a>
                 </div>
               </div>
@@ -1513,6 +2022,8 @@ export default function App() {
             </div>
           </header>
           <MainNav active="vowel" />
+          <InAppBrowserNotice />
+          <ProductInfo />
 
           <p className="eyebrow">A Sound Map</p>
           <h1 className="sound-map-title">{t('字母「A」的發音是怎樣的？','How can “A” sound?')}</h1>
@@ -1559,9 +2070,11 @@ export default function App() {
             </div>
           </section>
 
+          {paywallReason === 'repeat' && renderPaywall()}
 
         </section>
-      </main>
+        <SiteFooter />
+    </main>
     )
   }
 
@@ -1577,11 +2090,18 @@ export default function App() {
                   <button className={uiLang === 'en' ? 'active' : ''} onClick={() => changeUiLang('en')}>EN</button>
                 </div>
                 <div className="header-utility-links">
+                  <button
+                    type="button"
+                    className="upgrade-full-button"
+                    onClick={() => setShowProductInfo(true)}
+                  >
+                    {t('解鎖完整版', 'Unlock Full')}
+                  </button>
                   <a href="https://forms.gle/saW24XFSynYDiFW59" target="_blank" rel="noreferrer">
                     {t('意見回饋','Feedback')}
                   </a>
-                  <a href="https://ko-fi.com/entubeup" target="_blank" rel="noreferrer">
-                    {t('☕ 贊助','☕ Support')}
+                  <a href="mailto:uptools.support@gmail.com">
+                    {t('聯絡我們','Contact')}
                   </a>
                 </div>
               </div>
@@ -1592,6 +2112,8 @@ export default function App() {
 
         <section className="input-section">
           <MainNav active="sentence" />
+          <InAppBrowserNotice />
+          <ProductInfo />
 
           <label htmlFor="sentence" className="section-label">{t('請輸入您想要練習的單字或者是句子：','Type a word or sentence you want to practice:')}</label>
           <textarea
@@ -1731,15 +2253,12 @@ export default function App() {
             </button>
           </div>
 
-          {repeatTimerRef.current !== null && (
-            <button className="stop-button" onClick={stopRepeat}>
-              Stop repeat
-            </button>
-          )}
+{renderPaywall()}
         </section>
 
         
       </section>
+      <SiteFooter />
     </main>
   )
 }
