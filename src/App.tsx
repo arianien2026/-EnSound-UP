@@ -137,7 +137,7 @@ const [paywallReason, setPaywallReason] = useState<PaywallReason>(null)
 
   const isInAppBrowser = useMemo(() => {
     const ua = navigator.userAgent || ''
-    return /FBAN|FBAV|Instagram/i.test(ua)
+    return /FBAN|FBAV|Instagram|Line\//i.test(ua)
   }, [])
 
   function InAppBrowserNotice() {
