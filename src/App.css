@@ -866,6 +866,13 @@ footer {
 .level-result p { color:#65709c; }
 @media (max-width:560px) { .contrast-cards { grid-template-columns:1fr; } }
 
+.consonant-practice .learn-audio-actions {
+  grid-template-columns: 1fr;
+  max-width: 170px;
+}
+.consonant-note { margin: 16px auto; color: #7d86aa; line-height: 1.5; }
+.consonant-question { color: #202e6b; font-size: 22px; }
+
 /* Step 3C-1: clearer challenge flow */
 .challenge-topbar {
   position: relative;
