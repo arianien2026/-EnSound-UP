@@ -34,60 +34,15 @@ function speakWord(word: string, rate: number) {
   window.speechSynthesis.speak(utterance)
 }
 
-type SoundMapEntry = { vowel: string; word: string; ipa: string; note: string }
-
-const SOUND_MAP = {
-  A: [
-    { vowel: 'æ', word: 'cat', ipa: '/kæt/', note: 'cat · map · apple' },
-    { vowel: 'eɪ', word: 'name', ipa: '/neɪm/', note: 'name · cake · late' },
-    { vowel: 'ɑ', word: 'father', ipa: '/ˈfɑðɚ/', note: 'father' },
-    { vowel: 'ɔ', word: 'all', ipa: '/ɔl/', note: 'all · ball' },
-    { vowel: 'ə', word: 'about', ipa: '/əˈbaʊt/', note: 'about · ago · away' },
-    { vowel: 'ɛ', word: 'any', ipa: '/ˈɛni/', note: 'any · many' },
-    { vowel: 'ɪ', word: 'village', ipa: '/ˈvɪlɪdʒ/', note: 'village' },
-  ],
-  E: [
-    { vowel: 'ɛ', word: 'bed', ipa: '/bɛd/', note: 'bed' },
-    { vowel: 'iː', word: 'me', ipa: '/miː/', note: 'me' },
-    { vowel: 'ɪ', word: 'pretty', ipa: '/ˈprɪti/', note: 'pretty' },
-    { vowel: 'ə', word: 'problem', ipa: '/ˈprɑbləm/', note: 'problem' },
-  ],
-  I: [
-    { vowel: 'ɪ', word: 'sit', ipa: '/sɪt/', note: 'sit' },
-    { vowel: 'aɪ', word: 'time', ipa: '/taɪm/', note: 'time' },
-    { vowel: 'iː', word: 'machine', ipa: '/məˈʃiːn/', note: 'machine' },
-    { vowel: 'ə', word: 'pencil', ipa: '/ˈpɛnsəl/', note: 'pencil' },
-  ],
-  O: [
-    { vowel: 'ɑ', word: 'hot', ipa: '/hɑt/', note: 'hot' },
-    { vowel: 'oʊ', word: 'home', ipa: '/hoʊm/', note: 'home' },
-    { vowel: 'ʌ', word: 'love', ipa: '/lʌv/', note: 'love' },
-    { vowel: 'uː', word: 'do', ipa: '/duː/', note: 'do' },
-    { vowel: 'ʊ', word: 'woman', ipa: '/ˈwʊmən/', note: 'woman' },
-    { vowel: 'ə', word: 'today', ipa: '/təˈdeɪ/', note: 'today' },
-  ],
-  U: [
-    { vowel: 'ʌ', word: 'cup', ipa: '/kʌp/', note: 'cup' },
-    { vowel: 'juː', word: 'use', ipa: '/juːz/', note: 'use' },
-    { vowel: 'uː', word: 'rule', ipa: '/ruːl/', note: 'rule' },
-    { vowel: 'ʊ', word: 'put', ipa: '/pʊt/', note: 'put' },
-    { vowel: 'ə', word: 'support', ipa: '/səˈpɔrt/', note: 'support' },
-  ],
-} satisfies Record<'A' | 'E' | 'I' | 'O' | 'U', SoundMapEntry[]>
-
-type SoundMapLetter = keyof typeof SOUND_MAP
-const SOUND_MAP_LETTERS = Object.keys(SOUND_MAP) as SoundMapLetter[]
-
-const REPEATED_IPA_COLORS: Partial<Record<string, string>> = {
-  'ɛ': '#B02BC5',
-  'ɪ': '#1D5EFF',
-  'ə': '#0097A7',
-  'iː': '#009B62',
-  'ɑ': '#E45B16',
-  'ʌ': '#E13D67',
-  'uː': '#008ACB',
-  'ʊ': '#779900',
-}
+const A_SOUNDS = [
+  { vowel: 'æ', word: 'cat', ipa: '/kæt/', note: 'cat · map · apple' },
+  { vowel: 'eɪ', word: 'name', ipa: '/neɪm/', note: 'name · cake · late' },
+  { vowel: 'ɑ', word: 'father', ipa: '/ˈfɑðɚ/', note: 'father' },
+  { vowel: 'ɔ', word: 'all', ipa: '/ɔl/', note: 'all · ball' },
+  { vowel: 'ə', word: 'about', ipa: '/əˈbaʊt/', note: 'about · ago · away' },
+  { vowel: 'ɛ', word: 'any', ipa: '/ˈɛni/', note: 'any · many' },
+  { vowel: 'ɪ', word: 'village', ipa: '/ˈvɪlɪdʒ/', note: 'village' },
+]
 
 
 const LEVEL1_STAGES = [
@@ -281,9 +236,8 @@ function renderPaywall() {
   )
 }
 
-  const [screen, setScreen] = useState<'sentence' | 'vowel' | 'vowelBasics' | 'contrast' | 'audioqa' | 'level2proto' | 'choose2'>('contrast')
-  const [selectedSoundLetter, setSelectedSoundLetter] = useState<SoundMapLetter>('A')
-  const [selectedSoundIndex, setSelectedSoundIndex] = useState(0)
+  const [screen, setScreen] = useState<'sentence' | 'vowel' | 'contrast' | 'audioqa' | 'level2proto' | 'choose2'>('contrast')
+  const [selectedASoundIndex, setSelectedASoundIndex] = useState(0)
   const [contrastStageIndex, setContrastStageIndex] = useState(0)
   const [contrastPairIndex, setContrastPairIndex] = useState(0)
   const [contrastRepeatSide, setContrastRepeatSide] = useState<'left' | 'right' | null>(null)
@@ -302,7 +256,6 @@ function renderPaywall() {
   const [hasListened, setHasListened] = useState(false)
   const [isASoundRepeating, setIsASoundRepeating] = useState(false)
   const aSoundRepeatRef = useRef(false)
-  const soundRepeatSessionRef = useRef(0)
   const [sentence, setSentence] = useState(DEFAULT_SENTENCE)
   const [selectedIndex, setSelectedIndex] = useState<number | null>(5)
   const repeatTimerRef = useRef<number | null>(null)
@@ -403,8 +356,8 @@ if (!tryUseRepeat()) return
   }, 1800)
 }
 
-  function highlightSoundMapLetter(word: string) {
-    const index = word.toLowerCase().indexOf(selectedSoundLetter.toLowerCase())
+  function highlightLetterA(word: string) {
+    const index = word.toLowerCase().indexOf('a')
 
     if (index < 0) {
       return word
@@ -413,7 +366,7 @@ if (!tryUseRepeat()) return
     return (
       <>
         {word.slice(0, index)}
-        <span className="target-letter">{word[index]}</span>
+        <span className="target-letter">a</span>
         {word.slice(index + 1)}
       </>
     )
@@ -421,7 +374,6 @@ if (!tryUseRepeat()) return
 
   function stopASoundRepeat() {
     aSoundRepeatRef.current = false
-    soundRepeatSessionRef.current += 1
     setIsASoundRepeating(false)
     window.speechSynthesis.cancel()
   }
@@ -435,13 +387,12 @@ if (!tryUseRepeat()) return
     if (!tryUseRepeat()) return
 
     aSoundRepeatRef.current = true
-    const session = ++soundRepeatSessionRef.current
     setIsASoundRepeating(true)
 
     const loop = () => {
-      if (!aSoundRepeatRef.current || soundRepeatSessionRef.current !== session) return
+      if (!aSoundRepeatRef.current) return
 
-      const utterance = new SpeechSynthesisUtterance(selectedSound.word)
+      const utterance = new SpeechSynthesisUtterance(selectedASound.word)
       utterance.rate = 0.82
       const googleUsVoice = window.speechSynthesis
         .getVoices()
@@ -455,7 +406,7 @@ if (!tryUseRepeat()) return
         utterance.voice = googleUsVoice
       }
       utterance.onend = () => {
-        if (aSoundRepeatRef.current && soundRepeatSessionRef.current === session) {
+        if (aSoundRepeatRef.current) {
           window.setTimeout(loop, 350)
         }
       }
@@ -466,11 +417,10 @@ if (!tryUseRepeat()) return
     loop()
   }
 
-  const currentSounds = SOUND_MAP[selectedSoundLetter]
-  const selectedSound = currentSounds[selectedSoundIndex]
+  const selectedASound = A_SOUNDS[selectedASoundIndex]
 
-  function playSoundMapWord(index = selectedSoundIndex, rate = 0.82) {
-    speakWord(currentSounds[index].word, rate)
+  function playASound(index = selectedASoundIndex, rate = 0.82) {
+    speakWord(A_SOUNDS[index].word, rate)
   }
 
   const contrastStage = LEVEL1_STAGES[contrastStageIndex]
@@ -1131,7 +1081,7 @@ function nextChallengeQuestion() {
     )
   }
 
-  function MainNav({ active }: { active: 'sentence' | 'vowel' | 'vowelBasics' | 'guided' | 'choose2' | 'lab' | 'level2' }) {
+  function MainNav({ active }: { active: 'sentence' | 'vowel' | 'guided' | 'choose2' | 'lab' | 'level2' }) {
     return (
     <div className="mode-switch">
       <button className={`mode-button ${active === 'sentence' ? 'active' : ''}`} onClick={() => {
@@ -1139,10 +1089,7 @@ function nextChallengeQuestion() {
       }}>{t('單字 / 句子', 'Sentence')}</button>
       <button className={`mode-button ${active === 'vowel' ? 'active' : ''}`} onClick={() => {
         stopChooseLoop(); stopQaLoop(); stopL2Loop(); stopContrastRepeat(); setScreen('vowel')
-      }}>{t('母音發音', 'Vowel Sounds')}</button>
-      <button className={`mode-button ${active === 'vowelBasics' ? 'active' : ''}`} onClick={() => {
-        stopChooseLoop(); stopQaLoop(); stopL2Loop(); stopContrastRepeat(); stopASoundRepeat(); setScreen('vowelBasics')
-      }}>{t('母音核心說明', 'Vowel Basics')}</button>
+      }}>{t('A 的發音', 'A Sounds')}</button>
       <button className={`mode-button ${active === 'guided' ? 'active' : ''}`} onClick={() => {
         stopChooseLoop(); stopQaLoop(); stopL2Loop(); setContrastPhase('learn'); setScreen('contrast')
       }}>{t('音標練習導引', 'Guided')}</button>
@@ -2043,82 +1990,6 @@ if (chooseQuestion >= 5) {
     )
   }
 
-  if (screen === 'vowelBasics') {
-    return (
-      <main className="app-shell">
-        <section className="app-card vowel-basics">
-          <header className="header">
-            <div>
-              <div className="brand-row">
-                <div className="brand">EnSound <span>UP</span></div>
-                <div className="language-switch" aria-label="Language">
-                  <button className={uiLang === 'zh-TW' ? 'active' : ''} onClick={() => changeUiLang('zh-TW')}>繁中</button>
-                  <button className={uiLang === 'en' ? 'active' : ''} onClick={() => changeUiLang('en')}>EN</button>
-                </div>
-                <div className="header-utility-links">
-                  <button type="button" className="upgrade-full-button" onClick={() => setShowProductInfo(true)}>
-                    {t('解鎖完整版', 'Unlock Full')}
-                  </button>
-                  <a href="https://forms.gle/saW24XFSynYDiFW59" target="_blank" rel="noreferrer">{t('意見回饋','Feedback')}</a>
-                  <a href="mailto:uptools.support@gmail.com">{t('聯絡我們','Contact')}</a>
-                </div>
-              </div>
-              <p className="tagline">{t('一個字母，多種發音。', 'One letter. Many sounds.')}</p>
-            </div>
-          </header>
-          <MainNav active="vowelBasics" />
-          <InAppBrowserNotice />
-          <ProductInfo />
-
-          <p className="eyebrow">{t('母音核心說明', 'Vowel Basics')}</p>
-          <h1 className="sound-map-title">{t('一個字母，不只有一種發音。', 'One letter can have more than one sound.')}</h1>
-          <p className="vowel-basics-intro">
-            {t('同一個字母，可以有不同的聲音。', 'The same letter can make different sounds.')}<br />
-            {t('不同的字母，也可以有相同的聲音。', 'Different letters can share the same sound.')}
-          </p>
-          <p className="vowel-basics-guide">
-            {t('看看 A、E、I、O、U 的發音地圖，你能找到哪些重複的聲音？',
-              'Explore the A, E, I, O, U sound map. Which sounds can you find more than once?')}
-          </p>
-
-          <h2 className="vowel-basics-heading">{t('字母發音對照', 'Letter Sound Map')}</h2>
-          <p className="vowel-basics-hint">{t('找找看：哪些聲音重複出現？', 'Can you spot the sounds that repeat?')}</p>
-          <div className="vowel-basics-map">
-            {SOUND_MAP_LETTERS.map((letter) => (
-              <div className="vowel-basics-row" key={letter}>
-                <strong className="vowel-basics-letter">{letter}</strong>
-                <div className="vowel-basics-sounds">
-                  {SOUND_MAP[letter].map((sound) => (
-                    <span className="vowel-basics-sound" key={sound.vowel}>
-                      <span className="vowel-basics-ipa" style={REPEATED_IPA_COLORS[sound.vowel] ? { color: REPEATED_IPA_COLORS[sound.vowel] } : undefined}>
-                        /{sound.vowel}/
-                      </span> <span className="vowel-basics-word">{sound.word}</span>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="vowel-basics-takeaway">
-            <h2>{t('你發現了嗎？', 'Did you notice?')}</h2>
-            <p className="vowel-basics-discovery">
-              <strong style={{ color: REPEATED_IPA_COLORS['ə'] }}>/ə/</strong> {t('可以出現在 A、E、I、O、U。', 'can appear with A, E, I, O, and U.')}
-              <span className="vowel-basics-examples">about · problem · pencil · today · support</span>
-            </p>
-            <p className="vowel-basics-discovery">
-              <strong style={{ color: REPEATED_IPA_COLORS['ɪ'] }}>/ɪ/</strong> {t('也可以出現在 A、E、I。', 'can also appear with A, E, and I.')}
-              <span className="vowel-basics-examples">village · pretty · sit</span>
-            </p>
-            <p className="vowel-basics-conclusion">{t('所以真正要學的，不只是 A / E / I / O / U，而是你實際聽到的母音。',
-              'The goal is to recognize the vowel you actually hear, beyond learning the letters A / E / I / O / U.')}</p>
-          </div>
-        </section>
-        <SiteFooter />
-      </main>
-    )
-  }
-
   if (screen === 'vowel') {
     return (
       <main className="app-shell">
@@ -2154,45 +2025,26 @@ if (chooseQuestion >= 5) {
           <InAppBrowserNotice />
           <ProductInfo />
 
-          <p className="eyebrow">{selectedSoundLetter} Sound Map</p>
-          <h1 className="sound-map-title">{t(`字母「${selectedSoundLetter}」的發音是怎樣的？`, `How can “${selectedSoundLetter}” sound?`)}</h1>
+          <p className="eyebrow">A Sound Map</p>
+          <h1 className="sound-map-title">{t('字母「A」的發音是怎樣的？','How can “A” sound?')}</h1>
           <p className="sound-map-intro">
             {t('請點選下列音標發音練習','Tap a sound below to practice pronunciation.')}
           </p>
 
-          <div className="sound-map-letters" role="group" aria-label={t('選擇字母', 'Choose a letter')}>
-            {SOUND_MAP_LETTERS.map((letter) => (
-              <button
-                type="button"
-                key={letter}
-                className={selectedSoundLetter === letter ? 'active' : ''}
-                aria-pressed={selectedSoundLetter === letter}
-                onClick={() => {
-                  if (selectedSoundLetter === letter) return
-                  stopASoundRepeat()
-                  setSelectedSoundLetter(letter)
-                  setSelectedSoundIndex(0)
-                }}
-              >
-                {letter}
-              </button>
-            ))}
-          </div>
-
           <div className="sound-map-grid">
-            {currentSounds.map((sound, index) => (
+            {A_SOUNDS.map((sound, index) => (
               <button
                 type="button"
                 key={sound.vowel}
-                className={`sound-map-card ${selectedSoundIndex === index ? 'selected' : ''}`}
+                className={`sound-map-card ${selectedASoundIndex === index ? 'selected' : ''}`}
                 onClick={() => {
                   stopASoundRepeat()
-                  setSelectedSoundIndex(index)
-                  playSoundMapWord(index)
+                  setSelectedASoundIndex(index)
+                  playASound(index)
                 }}
               >
                 <span className="sound-map-symbol">/{sound.vowel}/</span>
-                <strong>{highlightSoundMapLetter(sound.word)}</strong>
+                <strong>{highlightLetterA(sound.word)}</strong>
                 <small>{sound.ipa}</small>
                 <span className="sound-map-speaker">🔊</span>
               </button>
@@ -2201,14 +2053,14 @@ if (chooseQuestion >= 5) {
 
           <section className="sound-focus-card">
             
-            <div className="sound-focus-symbol">/{selectedSound.vowel}/</div>
-            <div className="sound-focus-word">{highlightSoundMapLetter(selectedSound.word)}</div>
-            <div className="sound-focus-ipa">{selectedSound.ipa}</div>
-            <p className="sound-focus-examples">{selectedSound.note}</p>
+            <div className="sound-focus-symbol">/{selectedASound.vowel}/</div>
+            <div className="sound-focus-word">{highlightLetterA(selectedASound.word)}</div>
+            <div className="sound-focus-ipa">{selectedASound.ipa}</div>
+            <p className="sound-focus-examples">{selectedASound.note}</p>
 
             <div className="sound-focus-actions">
-              <button onClick={() => playSoundMapWord(selectedSoundIndex, 1)}>{t('🔊 播放','🔊 Play')}</button>
-              <button onClick={() => playSoundMapWord(selectedSoundIndex, 0.62)}>{t('🐢 慢速','🐢 Slow')}</button>
+              <button onClick={() => playASound(selectedASoundIndex, 1)}>{t('🔊 播放','🔊 Play')}</button>
+              <button onClick={() => playASound(selectedASoundIndex, 0.62)}>{t('🐢 慢速','🐢 Slow')}</button>
               <button
                 className={isASoundRepeating ? 'repeat-active' : ''}
                 onClick={toggleASoundRepeat}
@@ -2410,3 +2262,4 @@ if (chooseQuestion >= 5) {
     </main>
   )
 }
+

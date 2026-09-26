@@ -14,9 +14,6 @@ posthog.init(import.meta.env.VITE_POSTHOG_PROJECT_TOKEN, {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    {import.meta.env.DEV && (
-      <div className="development-build-bar">🧪 EnSound UP · Paid-MVP Vowel-1E-4</div>
-    )}
     <App />
   </StrictMode>,
 )
