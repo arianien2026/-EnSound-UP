@@ -78,11 +78,6 @@ const SOUND_MAP = {
 type SoundMapLetter = keyof typeof SOUND_MAP
 const SOUND_MAP_LETTERS = Object.keys(SOUND_MAP) as SoundMapLetter[]
 
-const CONSONANT_PAIR = [
-  { sound: 'p', word: 'pat', ipa: '/pæt/' },
-  { sound: 'b', word: 'bat', ipa: '/bæt/' },
-] as const
-
 const REPEATED_IPA_COLORS: Partial<Record<string, string>> = {
   'ɛ': '#B02BC5',
   'ɪ': '#1D5EFF',
@@ -286,17 +281,9 @@ function renderPaywall() {
   )
 }
 
-  const [screen, setScreen] = useState<'sentence' | 'vowel' | 'vowelBasics' | 'consonant' | 'contrast' | 'audioqa' | 'level2proto' | 'choose2'>('contrast')
+  const [screen, setScreen] = useState<'sentence' | 'vowel' | 'vowelBasics' | 'contrast' | 'audioqa' | 'level2proto' | 'choose2'>('contrast')
   const [selectedSoundLetter, setSelectedSoundLetter] = useState<SoundMapLetter>('A')
   const [selectedSoundIndex, setSelectedSoundIndex] = useState(0)
-  const [consonantPhase, setConsonantPhase] = useState<'compare' | 'challenge'>('compare')
-  const [consonantLooping, setConsonantLooping] = useState(false)
-  const [consonantPlayingWord, setConsonantPlayingWord] = useState<string | null>(null)
-  const consonantLoopSessionRef = useRef(0)
-  const [consonantQuestion, setConsonantQuestion] = useState(0)
-  const [consonantTarget, setConsonantTarget] = useState<0 | 1>(0)
-  const [consonantListened, setConsonantListened] = useState(false)
-  const [consonantAnswer, setConsonantAnswer] = useState<0 | 1 | null>(null)
   const [contrastStageIndex, setContrastStageIndex] = useState(0)
   const [contrastPairIndex, setContrastPairIndex] = useState(0)
   const [contrastRepeatSide, setContrastRepeatSide] = useState<'left' | 'right' | null>(null)
@@ -485,51 +472,6 @@ if (!tryUseRepeat()) return
   function playSoundMapWord(index = selectedSoundIndex, rate = 0.82) {
     speakWord(currentSounds[index].word, rate)
   }
-
-  function stopConsonantLoop() {
-    consonantLoopSessionRef.current += 1
-    setConsonantLooping(false)
-    setConsonantPlayingWord(null)
-    window.speechSynthesis.cancel()
-  }
-
-  function toggleConsonantLoop() {
-    if (consonantLooping) {
-      stopConsonantLoop()
-      return
-    }
-    if (!tryUseRepeat()) return
-
-    stopConsonantLoop()
-    const session = consonantLoopSessionRef.current
-    setConsonantLooping(true)
-    const playAt = (index: 0 | 1) => {
-      if (consonantLoopSessionRef.current !== session) return
-      const item = CONSONANT_PAIR[index]
-      setConsonantPlayingWord(item.word)
-      const utterance = new SpeechSynthesisUtterance(item.word)
-      utterance.lang = 'en-US'
-      utterance.rate = 0.82
-      const googleUsVoice = window.speechSynthesis.getVoices().find(
-        (voice) => voice.name === 'Google US English' && voice.lang === 'en-US',
-      )
-      if (googleUsVoice) utterance.voice = googleUsVoice
-      utterance.onend = () => {
-        if (consonantLoopSessionRef.current === session) {
-          window.setTimeout(() => playAt(index === 0 ? 1 : 0), 420)
-        }
-      }
-      utterance.onerror = () => {
-        if (consonantLoopSessionRef.current === session) stopConsonantLoop()
-      }
-      window.speechSynthesis.speak(utterance)
-    }
-    playAt(0)
-  }
-
-  useEffect(() => {
-    if (screen !== 'consonant' && consonantLooping) stopConsonantLoop()
-  }, [screen, consonantLooping])
 
   const contrastStage = LEVEL1_STAGES[contrastStageIndex]
   const contrastPair = contrastStage.pairs[contrastPairIndex % contrastStage.pairs.length]
@@ -1189,7 +1131,7 @@ function nextChallengeQuestion() {
     )
   }
 
-  function MainNav({ active }: { active: 'sentence' | 'vowel' | 'vowelBasics' | 'consonant' | 'guided' | 'choose2' | 'lab' | 'level2' }) {
+  function MainNav({ active }: { active: 'sentence' | 'vowel' | 'vowelBasics' | 'guided' | 'choose2' | 'lab' | 'level2' }) {
     return (
     <div className="mode-switch">
       <button className={`mode-button ${active === 'sentence' ? 'active' : ''}`} onClick={() => {
@@ -1210,9 +1152,6 @@ function nextChallengeQuestion() {
       <button className={`mode-button ${active === 'level2' ? 'active' : ''}`} onClick={() => {
         stopChooseLoop(); stopQaLoop(); stopContrastRepeat(); stopASoundRepeat(); setL2Phase('learn'); setScreen('level2proto')
       }}>{t('母音測驗', 'Vowel Test')}</button>
-      <button className={`mode-button ${active === 'consonant' ? 'active' : ''}`} onClick={() => {
-        stopChooseLoop(); stopQaLoop(); stopL2Loop(); stopContrastRepeat(); stopASoundRepeat(); setConsonantPhase('compare'); setScreen('consonant')
-      }}>{t('子音練習', 'Consonant Practice')}</button>
     </div>
     )
   }
@@ -2101,126 +2040,6 @@ if (chooseQuestion >= 5) {
         </section>
         <SiteFooter />
     </main>
-    )
-  }
-
-  if (screen === 'consonant') {
-    const target = CONSONANT_PAIR[consonantTarget]
-    return (
-      <main className="app-shell">
-        <section className="app-card contrast-practice consonant-practice">
-          <header className="header">
-            <div>
-              <div className="brand-row">
-                <div className="brand">EnSound <span>UP</span></div>
-                <div className="language-switch" aria-label="Language">
-                  <button className={uiLang === 'zh-TW' ? 'active' : ''} onClick={() => changeUiLang('zh-TW')}>繁中</button>
-                  <button className={uiLang === 'en' ? 'active' : ''} onClick={() => changeUiLang('en')}>EN</button>
-                </div>
-                <div className="header-utility-links">
-                  <button type="button" className="upgrade-full-button" onClick={() => setShowProductInfo(true)}>{t('解鎖完整版', 'Unlock Full')}</button>
-                  <a href="https://forms.gle/saW24XFSynYDiFW59" target="_blank" rel="noreferrer">{t('意見回饋', 'Feedback')}</a>
-                  <a href="mailto:uptools.support@gmail.com">{t('聯絡我們', 'Contact')}</a>
-                </div>
-              </div>
-              <p className="tagline">{t('專注聆聽子音的差異。', 'Focus on the difference between consonant sounds.')}</p>
-            </div>
-          </header>
-          <MainNav active="consonant" />
-          <InAppBrowserNotice />
-          <ProductInfo />
-
-          <p className="eyebrow">/p/ ↔ /b/</p>
-          <h1 className="contrast-title">{t('子音練習', 'Consonant Practice')}</h1>
-          <p className="contrast-subtitle">{t('專注聆聽子音的差異。', 'Focus on the difference between consonant sounds.')}</p>
-
-          {consonantPhase === 'compare' ? (
-            <>
-              <div className="contrast-cards">
-                {CONSONANT_PAIR.map((item) => (
-                  <div className="contrast-card contrast-learn-card" key={item.sound}>
-                    <span className="contrast-vowel">/{item.sound}/</span>
-                    <strong>{item.word.toUpperCase()}</strong>
-                    <span className="contrast-ipa">{item.ipa}</span>
-                    <div className="learn-audio-actions">
-                      <button onClick={() => { stopConsonantLoop(); speakWord(item.word, 0.82) }}>🔊 {t('播放', 'Play')}</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <p className="consonant-note">PAT ↔ BAT · {t('只有開頭子音不同；/æ/ 和 /t/ 相同。', 'Only the first consonant changes; /æ/ and /t/ stay the same.')}</p>
-              <div className="loop-control-panel compact">
-                <div className="loop-word-indicators">
-                  {CONSONANT_PAIR.map((item) => (
-                    <span key={item.sound} className={consonantPlayingWord === item.word ? 'playing' : ''}>{item.word.toUpperCase()}</span>
-                  ))}
-                </div>
-                <button className={`ab-loop-button ${consonantLooping ? 'active' : ''}`} onClick={toggleConsonantLoop}>
-                  {consonantLooping ? t('■ 停止循環', '■ Stop Loop') : t('∞ A/B 循環', '∞ A/B Loop')}
-                </button>
-              </div>
-              <button className="start-challenge" onClick={() => {
-                stopConsonantLoop()
-                setConsonantQuestion(0)
-                setConsonantTarget(Math.random() < 0.5 ? 0 : 1)
-                setConsonantListened(false)
-                setConsonantAnswer(null)
-                setConsonantPhase('challenge')
-              }}>{t('開始小挑戰 →', 'Start Mini Challenge →')}</button>
-              {paywallReason === 'repeat' && renderPaywall()}
-            </>
-          ) : (
-            <>
-              <p className="question-count">{t('第', 'Question')} {consonantQuestion + 1} / 2 {t('題', '')}</p>
-              <h2 className="consonant-question">{t('你聽到哪個子音？', 'Which consonant do you hear?')}</h2>
-              <p className={`listen-instruction ${consonantListened ? 'done' : ''}`}>
-                {consonantListened ? t('現在選擇你聽到的子音。', 'Now choose the consonant you heard.') : t('先聽聲音', 'Listen first')}
-              </p>
-              <button className={`challenge-sound ${consonantListened ? 'played' : ''}`} onClick={() => {
-                setConsonantListened(true)
-                speakWord(target.word, 0.82)
-              }}><span>🔊</span><strong>{consonantListened ? t('再播放一次', 'Play again') : t('先聽聲音', 'Listen first')}</strong></button>
-              <div className="challenge-choices">
-                {CONSONANT_PAIR.map((item, index) => {
-                  const chosen = consonantAnswer === index
-                  const correct = consonantAnswer !== null && consonantTarget === index
-                  const wrong = chosen && !correct
-                  return (
-                    <button key={item.sound} disabled={!consonantListened || consonantAnswer !== null}
-                      className={`${correct ? 'answer-correct' : wrong ? 'answer-wrong' : ''} ${!consonantListened ? 'locked' : ''}`}
-                      onClick={() => setConsonantAnswer(index as 0 | 1)}>
-                      /{item.sound}/
-                      {!consonantListened && <small>🔒 {t('先聽聲音', 'Listen first')}</small>}
-                    </button>
-                  )
-                })}
-              </div>
-              {consonantAnswer !== null && (
-                <div className={`challenge-feedback ${consonantAnswer === consonantTarget ? 'correct' : 'wrong'}`}>
-                  <div className="feedback-symbol">{consonantAnswer === consonantTarget ? '✓' : '✕'}</div>
-                  <strong className="feedback-title">{consonantAnswer === consonantTarget ? t('正確！', 'Correct!') : t('再試一次', 'Not quite')}</strong>
-                  {consonantAnswer !== consonantTarget && <p className="feedback-detail">{t('你選擇了', 'You chose')} /{CONSONANT_PAIR[consonantAnswer].sound}/ · {t('正確發音是', 'The sound was')} /{target.sound}/</p>}
-                  <div className="feedback-word">{target.word.toUpperCase()} <span>{target.ipa}</span></div>
-                  <div className="challenge-feedback-actions">
-                    <button onClick={() => speakWord(target.word, 0.82)}>{t('🔊 再播放一次', '🔊 Hear again')}</button>
-                    <button className="next-primary" onClick={() => {
-                      if (consonantQuestion === 1) {
-                        setConsonantPhase('compare')
-                      } else {
-                        setConsonantQuestion(1)
-                        setConsonantTarget(consonantTarget === 0 ? 1 : 0)
-                        setConsonantListened(false)
-                        setConsonantAnswer(null)
-                      }
-                    }}>{consonantQuestion === 1 ? t('返回比較 →', 'Back to comparison →') : t('下一題 →', 'Next →')}</button>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </section>
-        <SiteFooter />
-      </main>
     )
   }
 
